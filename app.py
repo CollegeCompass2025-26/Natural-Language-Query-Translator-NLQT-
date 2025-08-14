@@ -6,6 +6,7 @@ from db import fetch_rows, fetch_schema_tables_and_columns
 from prompt_builder import build_prompt
 from gemini_client import generate_sql
 from sql_validator import is_safe_sql
+from normalizer import normalize_query
 
 load_dotenv()
 
@@ -29,22 +30,27 @@ def nlp_query():
     if not user_q:
         return jsonify({"error": "Missing 'query' in JSON body"}), 400
 
-    prompt = build_prompt(SCHEMA, user_q)
+    # 1. Normalize fuzzy keywords first
+    normalized_q = normalize_query(user_q)
+
+    # 2. Build prompt using normalized query
+    prompt = build_prompt(SCHEMA, normalized_q)
     sql = generate_sql(prompt)
 
-    # Enforce LIMIT if missing (case-insensitive contains is fine here)
+    # 3. Enforce LIMIT if missing (case-insensitive)
     if " limit " not in sql.lower():
         sql = f"{sql}\nLIMIT {DEFAULT_LIMIT}"
 
+    # 4. Validate SQL
     safe, reason = is_safe_sql(sql)
     if not safe:
         return jsonify({"error": "unsafe_sql", "reason": reason, "sql": sql}), 400
 
+    # 5. Execute SQL
     try:
         rows = fetch_rows(sql)
         return jsonify({"sql": sql, "rows": rows})
     except Exception as e:
-        # Return SQL for debugging + error message
         return jsonify({"error": "execution_error", "message": str(e), "sql": sql}), 400
 
 
