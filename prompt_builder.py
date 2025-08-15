@@ -19,19 +19,19 @@ USER REQUEST:
 
 ======================
 ABSOLUTE RULES — NEVER BREAK THESE:
-1. Query MUST start with SELECT or WITH.
-2. Query MUST be read-only — no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, GRANT, REVOKE, COPY.
-3. NEVER include semicolons at the end of the query.
-4. ALWAYS add `LIMIT 500` if no explicit LIMIT is present.
-5. Use ONLY exact column names as shown in schema.
-6. No ambiguous references — qualify all columns with table aliases.
-7. **ALL string/text filters MUST be case-insensitive: ALWAYS wrap both sides of the comparison in LOWER().**
-   - Example: use LOWER(cp.state) = 'tamil nadu' instead of cp.state = 'Tamil Nadu'.
-   - If using LIKE, also apply LOWER(): LOWER(column) LIKE LOWER('%value%').
-======================
+1. Query MUST ALWAYS start with SELECT or WITH. ALWAYS.
+2. Query MUST ALWAYS be read-only — NEVER use INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, GRANT, REVOKE, COPY. ALWAYS.
+3. NEVER include semicolons at the end of the query. ALWAYS.
+4. ALWAYS add `LIMIT 500` if no explicit LIMIT is present. ALWAYS.
+5. ALWAYS use ONLY exact column names as shown in schema. ALWAYS.
+6. NEVER leave ambiguous column references — ALWAYS qualify all columns with table aliases. ALWAYS.
+7. ALL string/text filters MUST ALWAYS be case-insensitive: ALWAYS wrap BOTH sides in LOWER().  
+   - Example: LOWER(cp.state) = 'tamil nadu'.  
+   - Example for LIKE: LOWER(column) LIKE LOWER('%value%'). ALWAYS.
 
+======================
 ALWAYS INCLUDE THESE OUTPUT COLUMNS:
-- ALWAYS select **all columns** from `college_profiles` using `cp.*`.
+- ALWAYS select **all columns** from `college_profiles` using `cp.*`. ALWAYS.
 - ALWAYS include an aggregated alumni reviews array:
     COALESCE(
       JSON_AGG(
@@ -43,20 +43,18 @@ ALWAYS INCLUDE THESE OUTPUT COLUMNS:
         )
       ) FILTER (WHERE ar.id IS NOT NULL),
       '[]'
-    ) AS alumni_reviews
+    ) AS alumni_reviews. ALWAYS.
 
+======================
 JOIN & AGGREGATION RULES:
-- ALWAYS use explicit JOIN ... ON syntax for relationships.
-- ALWAYS LEFT JOIN `alumni_reviews` (alias `ar`) ON `cp.college = ar.college` so that every college row has its alumni_reviews array, even if empty.
-- To include parent rows even when child rows don’t exist: use LEFT JOIN and put child filters in the JOIN condition, NOT the WHERE clause.
+- ALWAYS use explicit JOIN ... ON syntax for ALL relationships. ALWAYS.
+- ALWAYS LEFT JOIN `alumni_reviews` (alias `ar`) ON `LOWER(cp.college) = LOWER(ar.college)` so that every college row has its alumni_reviews array, even if empty. ALWAYS.
+- ALWAYS move child filters (e.g., ar.rating < 4) INTO the JOIN condition, NEVER in the WHERE clause. ALWAYS.
 
+======================
 JSON_AGG RULES:
-- When returning related child rows, use:
-    COALESCE(
-      JSON_AGG(JSON_BUILD_OBJECT(...)) FILTER (WHERE child.id IS NOT NULL),
-      '[]'
-    )
-- NEVER put FILTER inside JSON_BUILD_OBJECT.
+- ALWAYS use COALESCE(JSON_AGG(...)) FILTER (WHERE child.id IS NOT NULL), '[]') for child arrays. ALWAYS.
+- NEVER put FILTER inside JSON_BUILD_OBJECT. ALWAYS.
   Example:
     ✅ Correct:
        COALESCE(
@@ -69,29 +67,31 @@ JSON_AGG RULES:
          '[]'
        )
 
+======================
 GROUP BY RULE:
-- If ANY aggregate function (e.g., JSON_AGG) is used alongside non-aggregated columns, you MUST add a GROUP BY that includes ALL non-aggregated columns from `college_profiles`.
-- Use either `GROUP BY cp.*` (if supported) or explicitly list all columns from `college_profiles`.
-- This is REQUIRED to avoid Postgres errors.
-  Example:
+- IF ANY aggregate function (e.g., JSON_AGG) is used alongside non-aggregated columns, you MUST ALWAYS add a GROUP BY that explicitly lists ALL non-aggregated columns from `college_profiles`. ALWAYS.
+- NEVER use `GROUP BY cp.*` — ALWAYS list all columns explicitly. ALWAYS.
+- Example:
     ✅ Correct:
        SELECT cp.*, COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', ar.id)) FILTER (WHERE ar.id IS NOT NULL), '[]') AS alumni_reviews
        FROM college_profiles cp
-       LEFT JOIN alumni_reviews ar ON cp.college = ar.college
-       GROUP BY cp.*
-    ❌ Incorrect (no GROUP BY):
+       LEFT JOIN alumni_reviews ar ON LOWER(cp.college) = LOWER(ar.college) AND ar.rating < 4
+       GROUP BY cp.id, cp.college, cp.infrastructure, cp.faculty, ...
+    ❌ Incorrect:
        SELECT cp.*, COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', ar.id)) FILTER (WHERE ar.id IS NOT NULL), '[]') AS alumni_reviews
        FROM college_profiles cp
-       LEFT JOIN alumni_reviews ar ON cp.college = ar.college
-
-SINGLE TABLE CASE:
-- Even if the user query is only about `college_profiles`, you MUST still join `alumni_reviews` and return the alumni_reviews array.
+       LEFT JOIN alumni_reviews ar ON LOWER(cp.college) = LOWER(ar.college)
+       GROUP BY cp.*
 
 ======================
-FINAL REMINDER: 
-Follow EVERY rule above exactly.  
-If ANY rule is broken, the SQL is INVALID.  
-Output ONLY the SQL. Nothing else.
+SINGLE TABLE CASE:
+- EVEN if the user query is ONLY about `college_profiles`, you MUST ALWAYS join `alumni_reviews` and return the alumni_reviews array. ALWAYS.
+
+======================
+FINAL REMINDER:
+- FOLLOW EVERY RULE ABOVE EXACTLY. ALWAYS.  
+- IF ANY RULE IS BROKEN, the SQL IS INVALID. ALWAYS.  
+- OUTPUT ONLY THE SQL. NOTHING ELSE. ALWAYS.
 ======================
 """
     return prompt
