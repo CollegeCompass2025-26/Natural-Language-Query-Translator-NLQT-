@@ -134,8 +134,18 @@ def nlp_query():
             "sql": sql
         }), 400
 
-# ---------- RUN WITH WAITRESS ----------
+# ---------- RUN WITH WAITRESS OR GUNICORN ----------
 if __name__ == "__main__":
+    import platform
     port = int(os.getenv("PORT", 5000))
-    print(f"Starting server on http://127.0.0.1:{port} ...")
-    serve(app, host="0.0.0.0", port=port)
+    
+    # Windows / local dev
+    if platform.system() == "Windows":
+        from waitress import serve
+        print(f"Starting Waitress on http://127.0.0.1:{port}")
+        serve(app, host="0.0.0.0", port=port)
+    else:
+        # Linux / Render / production
+        print(f"Use Gunicorn to serve this app on port {port}")
+        app.run(host="0.0.0.0", port=port)
+
