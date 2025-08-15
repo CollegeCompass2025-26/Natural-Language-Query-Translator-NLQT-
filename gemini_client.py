@@ -12,7 +12,7 @@ if not API_KEY:
 
 # Configure the SDK once at import time
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel(MODEL_NAME)
+model = genai.GenerativeModel(MODEL_NAME,generation_config={"temperature": 0})
 
 
 def generate_sql(prompt: str) -> str:

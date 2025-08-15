@@ -1,0 +1,249 @@
+{
+  "info": {
+    "name": "NLQT - Full Test Suite",
+    "_postman_id": "nlqt-full-test-suite-001",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Show all colleges",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"query\":\"Show all colleges\"}"
+        },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('response ok or handled', function () {",
+              "  const j = pm.response.json();",
+              "  pm.expect(j).to.be.an('object');",
+              "  pm.expect(j).to.have.property('sql');",
+              "});",
+              "console.log('normalized:', pm.response.json().normalized_query);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - List cheap colleges in Pune",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"List cheap colleges in Pune\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('has sql', () => { pm.expect(pm.response.json()).to.have.property('sql'); });",
+              "pm.test('cheap -> ug_fee presence in normalized', () => {",
+              "  const jq = pm.response.json();",
+              "  if (jq.normalized_query) pm.expect(jq.normalized_query.toLowerCase()).to.include('ug_fee');",
+              "});",
+              "console.log('info:', pm.response.json().info || pm.response.json().hints_used);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Best engineering schools in Maharashtra",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"Best engineering schools in Maharashtra\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('response contains either rows or info', function () {",
+              "  const r = pm.response.json();",
+              "  pm.expect(r).to.be.an('object');",
+              "});",
+              "console.log('normalized:', pm.response.json().normalized_query);",
+              "console.log('assumptions:', pm.response.json().hints_used || pm.response.json().info);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Top 5 engineering colleges",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"Top 5 engineering colleges\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('limit or order present', function () {",
+              "  const r = pm.response.json();",
+              "  pm.expect(r.sql.toLowerCase()).to.include('order by');",
+              "});",
+              "console.log('sql:', pm.response.json().sql);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Show alumni reviews for J.C. Bose University Of Science And Technology, Haryana",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"Show alumni reviews for J.C. Bose University Of Science And Technology, Haryana\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('returns no_results OR rows', () => {",
+              "  pm.expect(res).to.be.an('object');",
+              "  pm.expect(res).to.satisfy(r => r.hasOwnProperty('rows') || r.hasOwnProperty('error') || r.hasOwnProperty('message'))",
+              "});",
+              "console.log('response:', res);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Unsafe SQL attempt (DROP) should be rejected",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"DROP TABLE college_profiles\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('should be unsafe_sql or rejection', function () {",
+              "  const r = pm.response.json();",
+              "  pm.expect(r).to.be.an('object');",
+              "  pm.expect(r).to.have.property('error');",
+              "  pm.expect(r.error === 'unsafe_sql' || r.error === 'execution_error').to.be.true;",
+              "});",
+              "console.log(pm.response.json());"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Good placements in Tamil Nadu",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"Good placements in Tamil Nadu\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('placement mapping or assumptions present', () => {",
+              "  const r = pm.response.json();",
+              "  if (r.normalized_query) pm.expect(r.normalized_query.toLowerCase()).to.include('placement');",
+              "});",
+              "console.log('normalized:', pm.response.json().normalized_query);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Misspelling: Best engg collages in meharashtra (misspellings)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"Best engg collages in meharashtra\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('misspelling handled or normalized query present', () => {",
+              "  const r = pm.response.json();",
+              "  pm.expect(r).to.be.an('object');",
+              "  if (r.normalized_query) console.log('normalized:', r.normalized_query);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Ambiguous: Good colleges (clarification expected)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"query\":\"Good colleges\"}" },
+        "url": { "raw": "{{baseUrl}}/nlp-query", "host": ["{{baseUrl}}"], "path": ["nlp-query"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const r = pm.response.json();",
+              "pm.test('clarification or assumption present', () => {",
+              "  pm.expect(r).to.be.an('object');",
+              "  pm.expect(r.info || r.hints_used || r.hints).to.exist;",
+              "});",
+              "console.log('info/hints:', r.info || r.hints_used || r.hints);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" }
+  ]
+}

@@ -1,6 +1,5 @@
 from typing import Dict, List
 
-# Tailored to your schema (college_profiles, alumni_reviews), but generic enough for others.
 def build_prompt(schema: Dict[str, List[str]], user_query: str) -> str:
     schema_lines = []
     for table, cols in schema.items():
@@ -8,7 +7,9 @@ def build_prompt(schema: Dict[str, List[str]], user_query: str) -> str:
     schema_text = "\n".join(schema_lines)
 
     prompt = f"""
-You are an expert PostgreSQL query generator. Output ONLY one safe, read-only SQL query in PostgreSQL dialect, with no explanations.
+You are an expert PostgreSQL query generator.
+Your job: **Return EXACTLY ONE safe, read-only SQL query** in PostgreSQL dialect.  
+NO explanations, NO comments, NO extra text. Only the SQL.
 
 DATABASE SCHEMA (public):
 {schema_text}
@@ -16,32 +17,78 @@ DATABASE SCHEMA (public):
 USER REQUEST:
 \"\"\"{user_query}\"\"\"
 
-REQUIREMENTS:
-- Use explicit JOINs with ON for relationships.
-- If selecting parent rows (e.g., colleges) with related child rows (e.g., alumni_reviews), return one row per parent and aggregate child rows into a JSON array using JSON_AGG(JSON_BUILD_OBJECT(...)).
-- Apply FILTER (WHERE ...) directly to JSON_AGG, NOT inside JSON_BUILD_OBJECT. 
-  *Correct:* 
+======================
+ABSOLUTE RULES — NEVER BREAK THESE:
+1. Query MUST start with SELECT or WITH.
+2. Query MUST be read-only — no INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, GRANT, REVOKE, COPY.
+3. NEVER include semicolons at the end of the query.
+4. ALWAYS add `LIMIT 500` if no explicit LIMIT is present.
+5. Use ONLY exact column names as shown in schema.
+6. No ambiguous references — qualify all columns with table aliases.
+======================
+
+ALWAYS INCLUDE THESE OUTPUT COLUMNS:
+- ALWAYS select **all columns** from `college_profiles` using `cp.*`.
+- ALWAYS include an aggregated alumni reviews array:
     COALESCE(
-      JSON_AGG(JSON_BUILD_OBJECT('id', ar.id, 'name', ar.name)) FILTER (WHERE ar.id IS NOT NULL),
+      JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'id', ar.id,
+          'name', ar.name,
+          'review', ar.review,
+          'rating', ar.rating
+        )
+      ) FILTER (WHERE ar.id IS NOT NULL),
+      '[]'
+    ) AS alumni_reviews
+
+JOIN & AGGREGATION RULES:
+- ALWAYS use explicit JOIN ... ON syntax for relationships.
+- ALWAYS LEFT JOIN `alumni_reviews` (alias `ar`) ON `cp.college = ar.college` so that every college row has its alumni_reviews array, even if empty.
+- To include parent rows even when child rows don’t exist: use LEFT JOIN and put child filters in the JOIN condition, NOT the WHERE clause.
+
+JSON_AGG RULES:
+- When returning related child rows, use:
+    COALESCE(
+      JSON_AGG(JSON_BUILD_OBJECT(...)) FILTER (WHERE child.id IS NOT NULL),
       '[]'
     )
-  *Incorrect:* 
-    COALESCE(
-      JSON_AGG(JSON_BUILD_OBJECT('id', ar.id, 'name', ar.name) FILTER (WHERE ar.id IS NOT NULL)),
-      '[]'
-    )
-- Always wrap JSON_AGG in COALESCE(..., '[]') to return an empty array when no rows exist.
-- To include parent rows even when there are zero matching child rows, use LEFT JOIN and put child filters in the JOIN condition, not in WHERE.
-- Use exact column names as shown in the schema.
-- Never modify data. Only SELECT/CTE allowed. No semicolons. Add LIMIT 500 if not specified.
-- Do not include comments or explanations.
-- Do not include semicolons at the end of the query.
-- The first token of the query must be SELECT or WITH.
-- If only one table is needed, use a simple SELECT with LIMIT 500.
-- When using JSON_AGG with non-aggregated parent columns, add a GROUP BY including every selected parent column.
+- NEVER put FILTER inside JSON_BUILD_OBJECT.
+  Example:
+    ✅ Correct:
+       COALESCE(
+         JSON_AGG(JSON_BUILD_OBJECT('id', ar.id, 'name', ar.name)) FILTER (WHERE ar.id IS NOT NULL),
+         '[]'
+       )
+    ❌ Incorrect:
+       COALESCE(
+         JSON_AGG(JSON_BUILD_OBJECT('id', ar.id, 'name', ar.name) FILTER (WHERE ar.id IS NOT NULL)),
+         '[]'
+       )
 
+GROUP BY RULE:
+- If ANY aggregate function (e.g., JSON_AGG) is used alongside non-aggregated columns, you MUST add a GROUP BY that includes ALL non-aggregated columns from `college_profiles`.
+- Use either `GROUP BY cp.*` (if supported) or explicitly list all columns from `college_profiles`.
+- This is REQUIRED to avoid Postgres errors.
+  Example:
+    ✅ Correct:
+       SELECT cp.*, COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', ar.id)) FILTER (WHERE ar.id IS NOT NULL), '[]') AS alumni_reviews
+       FROM college_profiles cp
+       LEFT JOIN alumni_reviews ar ON cp.college = ar.college
+       GROUP BY cp.*
+    ❌ Incorrect (no GROUP BY):
+       SELECT cp.*, COALESCE(JSON_AGG(JSON_BUILD_OBJECT('id', ar.id)) FILTER (WHERE ar.id IS NOT NULL), '[]') AS alumni_reviews
+       FROM college_profiles cp
+       LEFT JOIN alumni_reviews ar ON cp.college = ar.college
 
+SINGLE TABLE CASE:
+- Even if the user query is only about `college_profiles`, you MUST still join `alumni_reviews` and return the alumni_reviews array.
 
-Only output the SQL. No commentary.
+======================
+FINAL REMINDER: 
+Follow EVERY rule above exactly.  
+If ANY rule is broken, the SQL is INVALID.  
+Output ONLY the SQL. Nothing else.
+======================
 """
     return prompt
