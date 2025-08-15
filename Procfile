@@ -1,2 +1,2 @@
 
-web: gunicorn app:app -w 4 -b 0.0.0.0:$POR
+web: gunicorn app:app
