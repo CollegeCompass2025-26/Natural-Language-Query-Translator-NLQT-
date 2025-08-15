@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NLQT Query Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.6.2/dist/dotlottie-wc.js" type="module"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* Chat message animation */
+.chat-message {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.chat-message.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+  #pageContent {
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+/* When ready, show class will fade and slide in */
+#pageContent.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+  /* Page base */
+  body {
+    background: radial-gradient(circle, rgba(255,255,255,1) 1%, rgba(238,174,202,1) 65%, rgba(193,180,217,1) 100%);
+    font-family: 'Orbitron', sans-serif;
+    margin: 0;
+  }
+
+  /* Halve font size for all non-heading elements (keeps h1..h6 full size) */
+  body *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+    font-size: 0.5em !important;
+  }
+
+
+  /* Table */
+  .toggle-btn { margin-bottom:1rem; }
+  .table-wrapper { overflow-x:auto; }
+  .results-table { width:100%; border-collapse: collapse; margin-top:1rem; display:none; min-width:1200px;}
+  .results-table th, .results-table td { border:1px solid #ccc; padding:0.5rem; text-align:left; vertical-align:top; transition: background 0.3s; }
+  .results-table th { position: sticky; top:0; background:#fff; z-index:2; }
+  .results-table tr:hover { background:#f0e6ff; }
+  .chip { display:inline-block; background:#e0d7f8; color:#6a0dad; padding:2px 8px; border-radius:12px; margin:2px; font-size:0.85rem; cursor:pointer; transition:0.3s;}
+  .chip:hover { background:#cbb3f5; }
+  .collapse-toggle { cursor:pointer; color:#6a0dad; text-decoration:underline; font-size:0.85rem; margin-left:5px; }
+  .review-list { display:none; margin-top:0.5rem; margin-left:0; padding-left:1rem; }
+
+  /* Cards */
+  .card-container { display:none; flex-wrap:wrap; gap:1rem; margin-top:1rem; }
+  .card { background:#fff; padding:1rem; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); width:calc(33% - 1rem); transition:transform 0.3s, box-shadow 0.3s, max-height 0.5s ease-in-out; cursor:pointer; overflow:hidden; max-height:180px;}
+  .card:hover { transform: translateY(-5px); box-shadow:0 5px 15px rgba(0,0,0,0.2); }
+  .card .details { margin-top:0.5rem; color:#555; }
+  .card .chips { margin-top:0.5rem; display:flex; flex-wrap:wrap; gap:0.3rem; }
+  .card .chip-inline { position:relative; }
+  .review-inline { display:none; background:#f1e6ff; color:#6a0dad; padding:8px; border-radius:6px; margin-top:4px; font-size:0.85rem; }
+
+  /* Modal (shared) */
+  .modal {
+    display:none;
+    position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);
+    justify-content:center; align-items:center; z-index:1000;
+  }
+  .modal-content {
+    background:#fff; padding:1.5rem; border-radius:10px; max-width:800px; max-height:80%; overflow-y:auto;
+    box-shadow:0 5px 20px rgba(0,0,0,0.3);
+  }
+  .modal-close { float:right; cursor:pointer; color:#6a0dad; font-weight:bold; font-size:1.9rem; }
+
+  /* small responsive tweaks */
+  @media (max-width: 900px) {
+    .card { width: calc(50% - 1rem); }
+    .flex-2-6 { width: 40%; } /* optional if you want */
+  }
+  @media (max-width: 600px) {
+    .card { width: calc(100% - 1rem); }
+  }
+
+</style>
+</head>
+<body class="h-screen bg-gray-50">
+ <div id="pageContent" class="opacity-0 translate-y-4">
+<header class="flex items-center justify-between px-6 py-4">
+  <div class="flex items-center gap-3">
+    <img src="static\images\logo.png" alt="Logo" class="w-10 h-10">
+    <h1 class="ml-2 text-3xl font-bold tracking-wide text-purple-900">Natural Language To Query Executor</h1>
+  </div>
+  <button onclick="showSchema()" class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-xl hover:bg-purple-700 transition-all shadow-md">See Current Schema</button>
+</header>
+
+<div class=" flex gap-6 p-6 h-[calc(100vh-100px)]">
+  <!-- Chat Column -->
+  <div class="bg-white rounded-3xl shadow-lg flex flex-col h-full w-2/6 overflow-hidden">
+    <div id="chatBox" class="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 rounded-t-3xl" style="background-color: #FBEDF3;"></div>
+    <div class="p-4 border-t bg-gray-50 flex gap-2 rounded-b-3xl">
+      <input id="queryInput" type="text" class="flex-1 p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-300" placeholder="Type your query..." />
+      <button id="runBtn" onclick="sendQuery()" class="px-6 py-3 bg-purple-600 text-white rounded-xl shadow hover:bg-purple-700 transform hover:scale-105 transition-all">Run</button>
+    </div>
+
+  </div>
+
+  <!-- Results Column -->
+  <div class="bg-white rounded-3xl shadow-lg p-6 flex-1 flex flex-col overflow-y-auto" style="background-color: #FBEDF3;">
+    <div class="flex items-center justify-between mb-4">
+  <h2 class="text-2xl font-bold text-purple-800">Queried Results</h2>
+  <div class="flex gap-2">
+    <button id="tableBtn" class="bg-purple-600 text-white px-4 py-2 rounded-md flex items-center gap-2 shadow hover:bg-purple-700 transition-all" onclick="switchToTable()">
+      <img src="static\images\table.png" class="w-5 h-5" alt="Table Icon">
+    </button>
+    <button id="cardBtn" class="bg-gray-200 text-purple-800 px-4 py-2 rounded-md flex items-center gap-2 shadow hover:bg-purple-100 transition-all" onclick="switchToCards()">
+      <img src="static\images\cards.png" class="w-5 h-5" alt="Cards Icon">
+    </button>
+  </div>
+</div>
+
+
+    <div class="table-wrapper">
+      <table class="results-table" id="resultsTable" aria-live="polite">
+        <thead>
+          <tr>
+            <th>College</th><th>State</th><th>Stream</th><th>Rating</th>
+            <th>UG Fee</th><th>PG Fee</th><th>Academic</th><th>Faculty</th>
+            <th>Infrastructure</th><th>Placement</th><th>Social Life</th><th>Alumni Reviews</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="card-container" id="cardContainer" role="region" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal" id="reviewModal" aria-hidden="true">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeModal()">&times;</span>
+    <div id="modalText"></div>
+  </div>
+</div>
+
+<!-- Schema Modal -->
+<div class="modal" id="schemaModal" aria-hidden="true">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeSchema()">&times;</span>
+    <h3 class="text-xl font-bold mb-2">Current Schema</h3>
+    <pre id="schemaContent" style="white-space:pre-wrap; font-size:0.9rem; background:#f7f7fb; padding:0.8rem; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
+  </div>
+</div>
+</div>
+
+<script>
+/*
+  Behavior:
+  - chatHistory and lastQueryResults are stored in sessionStorage (cleared on tab close / refresh)
+  - API errors are shown as system/Nelly messages in the chat column
+  - Robust handling for missing/empty rows
+*/
+
+const chatBox = document.getElementById('chatBox');
+const resultsTable = document.getElementById('resultsTable');
+const cardContainer = document.getElementById('cardContainer');
+
+let chatHistory = JSON.parse(sessionStorage.getItem('chatHistory') || "[]");
+let lastQueryResults = JSON.parse(sessionStorage.getItem('lastQueryResults') || "null"); // can be null or array
+
+renderChat();
+
+// -------------------- Chat Rendering --------------------
+function renderChat() {
+  chatBox.innerHTML = chatHistory.map((msg, index) => {
+    let content;
+    if (msg.sender === 'user') {
+      content = `<div class="flex justify-end"><div class="bg-purple-600 text-white px-4 py-2 rounded-2xl max-w-xs shadow-md">${escapeHtml(msg.text)}</div></div>`;
+    } else if (msg.sender === 'loading') {
+      content = `<div class="flex justify-start items-start gap-2"><img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-8 h-8 rounded-full"><dotlottie-wc src="https://lottie.host/67570f3d-e1d9-4dcb-bc07-d7adc2f7e966/zR8BtbtgeY.lottie" style="width: 60px; height: 60px" speed="1" autoplay loop></dotlottie-wc></div>`;
+    } else {
+      content = `<div class="flex justify-start items-start gap-2"><img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-8 h-8 rounded-full"><div class="bg-purple-100 text-purple-900 px-4 py-2 rounded-2xl max-w-xs shadow-md"><strong>Nelly:</strong> ${escapeHtml(msg.text)}</div></div>`;
+    }
+
+    return `<div class="chat-message" id="chat-msg-${index}">${content}</div>`;
+  }).join('');
+
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Trigger animation for each message with a slight stagger
+  chatHistory.forEach((_, index) => {
+    const el = document.getElementById(`chat-msg-${index}`);
+    if (el) setTimeout(() => el.classList.add('show'), 50 + index * 50);
+  });
+}
+
+
+// simple HTML escape to avoid accidental HTML injection from remote text
+function escapeHtml(str) {
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// -------------------- Query + Fetch --------------------
+async function sendQuery() {
+  const input = document.getElementById('queryInput');
+  const query = input.value.trim();
+  if (!query) return;
+
+  // push user message + loading marker
+  chatHistory.push({ sender: 'user', text: query });
+  chatHistory.push({ sender: 'loading', text: '' });
+  sessionStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+  renderChat();
+  input.value = '';
+
+  try {
+    const res = await fetch('/nlp-query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    // Try parse JSON (if parse fails, we'll handle in catch)
+    const data = await res.json();
+
+    // remove loading markers
+    chatHistory = chatHistory.filter(m => m.sender !== 'loading');
+
+    // If backend explicitly says error (structured)
+    if (data && data.error) {
+      const message = data.message || 'An error occurred while processing your request.';
+      chatHistory.push({ sender: 'system', text: message });
+
+      // Clear previous results in UI / memory
+      lastQueryResults = null;
+      sessionStorage.setItem('lastQueryResults', JSON.stringify(lastQueryResults));
+      resultsTable.style.display = 'none';
+      cardContainer.style.display = 'none';
+    }
+    else if (data && Array.isArray(data.rows) && data.rows.length > 0) {
+      // Successful result with rows
+      chatHistory.push({ sender: 'system', text: data.message || 'Your result has been generated.' });
+
+      // Save results into sessionStorage so review modal and refresh-safe within session works
+      lastQueryResults = data.rows;
+      sessionStorage.setItem('lastQueryResults', JSON.stringify(lastQueryResults));
+
+      // Populate UI
+      populateTable(data.rows);
+      populateCards(data.rows);
+
+      resultsTable.style.display = 'table';
+      cardContainer.style.display = 'none'; // default to table view
+    }
+    else if (data && Array.isArray(data.rows) && data.rows.length === 0) {
+      // Explicit empty array returned
+      const message = data.message || 'No matching records found for your query.';
+      chatHistory.push({ sender: 'system', text: message });
+
+      lastQueryResults = null;
+      sessionStorage.setItem('lastQueryResults', JSON.stringify(lastQueryResults));
+      resultsTable.style.display = 'none';
+      cardContainer.style.display = 'none';
+    }
+    else {
+      // No rows property or unexpected shape
+      const message = (data && data.message) ? data.message : 'No response rows were returned from the server.';
+      chatHistory.push({ sender: 'system', text: message });
+
+      lastQueryResults = null;
+      sessionStorage.setItem('lastQueryResults', JSON.stringify(lastQueryResults));
+      resultsTable.style.display = 'none';
+      cardContainer.style.display = 'none';
+    }
+
+    sessionStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    renderChat();
+  } catch (err) {
+    // network / parse errors
+    console.error('Fetch error:', err);
+    chatHistory = chatHistory.filter(m => m.sender !== 'loading');
+    chatHistory.push({ sender: 'system', text: 'Could not reach server. Please check your connection or try again.' });
+    sessionStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    lastQueryResults = null;
+    sessionStorage.setItem('lastQueryResults', JSON.stringify(lastQueryResults));
+    resultsTable.style.display = 'none';
+    cardContainer.style.display = 'none';
+    renderChat();
+  } finally {
+  }
+}
+
+// ------------------- Results Section Functions -------------------
+function populateTable(colleges) {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  (colleges || []).forEach((c, i) => {
+    const reviews = Array.isArray(c.alumni_reviews) ? c.alumni_reviews : [];
+    let reviewsHTML = '';
+    if (reviews.length === 0) {
+      reviewsHTML = '<span style="color:#999;font-style:italic;">No reviews yet</span>';
+    } else {
+      const firstTwo = reviews.slice(0, 2).map((r, j) => `<span class="chip" onclick="showReviewModal(${i},${j})">${escapeHtml(r.name)} (${escapeHtml(r.rating)})</span>`).join(' ');
+      let extraCount = '', hiddenReviews = '';
+      if (reviews.length > 2) {
+        extraCount = ` <span class="collapse-toggle" onclick="toggleReview(this,event)">+${reviews.length - 2} more</span>`;
+        hiddenReviews = `<div class="review-list">${reviews.slice(2).map((r, j) => `<span class="chip" onclick="showReviewModal(${i},${j + 2})">${escapeHtml(r.name)} (${escapeHtml(r.rating)})</span>`).join('')}</div>`;
+      }
+      reviewsHTML = firstTwo + extraCount + hiddenReviews;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(c.college || '')}</td>
+                    <td>${escapeHtml(c.state || '')}</td>
+                    <td>${escapeHtml(c.stream || '')}</td>
+                    <td>${escapeHtml(c.rating || '')}</td>
+                    <td>${escapeHtml(c.ug_fee || 'N/A')}</td>
+                    <td>${escapeHtml(c.pg_fee || 'N/A')}</td>
+                    <td>${escapeHtml(c.academic || '')}</td>
+                    <td>${escapeHtml(c.faculty || '')}</td>
+                    <td>${escapeHtml(c.infrastructure || '')}</td>
+                    <td>${escapeHtml(c.placement || '')}</td>
+                    <td>${escapeHtml(c.social_life || '')}</td>
+                    <td>${reviewsHTML}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function toggleReview(el, event) {
+  event.stopPropagation();
+  const reviewList = el.nextElementSibling;
+  if (!reviewList) return;
+  if (reviewList.style.display === 'block') {
+    reviewList.style.display = 'none';
+    el.textContent = `+${reviewList.children.length} more`;
+  } else {
+    reviewList.style.display = 'block';
+    el.textContent = '- Hide';
+  }
+}
+
+function populateCards(colleges) {
+  const container = document.getElementById('cardContainer');
+  container.innerHTML = '';
+  (colleges || []).forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const reviews = Array.isArray(c.alumni_reviews) ? c.alumni_reviews : [];
+
+    let chipsHTML = '';
+    if (reviews.length === 0) chipsHTML = '<span style="color:#999;font-style:italic;">No reviews yet</span>';
+    else chipsHTML = reviews.map((r, j) => `<div class="chip-inline" onclick="toggleInlineReview(this)"><span class="chip">${escapeHtml(r.name)} (${escapeHtml(r.rating)})</span><div class="review-inline">${escapeHtml(r.review || '')}</div></div>`).join('');
+
+    const allDetailsHTML = `<div class="all-details" style="display:none; margin-top:0.5rem;">
+      <p>UG Fee: ${escapeHtml(c.ug_fee || 'N/A')} | PG Fee: ${escapeHtml(c.pg_fee || 'N/A')}</p>
+      <p>Academic: ${escapeHtml(c.academic || '')} | Faculty: ${escapeHtml(c.faculty || '')} | Infrastructure: ${escapeHtml(c.infrastructure || '')}</p>
+      <p>Placement: ${escapeHtml(c.placement || '')} | Social Life: ${escapeHtml(c.social_life || '')}</p>
+    </div>`;
+
+    card.innerHTML = `<strong>${escapeHtml(c.college || '')}</strong><p>${escapeHtml(c.state || '')} | ${escapeHtml(c.stream || '')} | Rating: ${escapeHtml(c.rating || '')}</p>
+                      <div class="chips">${chipsHTML}</div>${allDetailsHTML}`;
+
+    card.onclick = function (e) {
+      if (e.target.closest('.chip-inline')) return;
+      this.classList.toggle('expanded');
+      const details = this.querySelector('.all-details');
+      details.style.display = (details.style.display === 'block') ? 'none' : 'block';
+      this.style.maxHeight = this.scrollHeight + 'px';
+    };
+
+    container.appendChild(card);
+  });
+  // show cards if we populated them
+  if ((colleges || []).length > 0) {
+    cardContainer.style.display = 'none'; // default remains table; user can toggle
+  } else {
+    cardContainer.style.display = 'none';
+  }
+}
+
+function toggleInlineReview(el) {
+  const reviewDiv = el.querySelector('.review-inline');
+  if (!reviewDiv) return;
+  reviewDiv.style.display = (reviewDiv.style.display === 'block') ? 'none' : 'block';
+  const card = el.closest('.card');
+  if (card) card.style.maxHeight = card.scrollHeight + 'px';
+}
+
+function switchToTable() {
+  const table = document.getElementById('resultsTable');
+  const cards = document.getElementById('cardContainer');
+  
+  table.style.display = 'table';
+  cards.style.display = 'none';
+
+  // update button styles (active state)
+  document.getElementById('tableBtn').classList.remove('bg-gray-200','text-purple-800');
+  document.getElementById('tableBtn').classList.add('bg-purple-600','text-white');
+  document.getElementById('cardBtn').classList.remove('bg-purple-600','text-white');
+  document.getElementById('cardBtn').classList.add('bg-gray-200','text-purple-800');
+}
+
+function switchToCards() {
+  const table = document.getElementById('resultsTable');
+  const cards = document.getElementById('cardContainer');
+  
+  // only show cards if we actually have results
+  if (lastQueryResults && Array.isArray(lastQueryResults) && lastQueryResults.length > 0) {
+    table.style.display = 'none';
+    cards.style.display = 'flex';
+    
+    // update button styles (active state)
+    document.getElementById('cardBtn').classList.remove('bg-gray-200','text-purple-800');
+    document.getElementById('cardBtn').classList.add('bg-purple-600','text-white');
+    document.getElementById('tableBtn').classList.remove('bg-purple-600','text-white');
+    document.getElementById('tableBtn').classList.add('bg-gray-200','text-purple-800');
+  }
+}
+
+
+function showReviewModal(colIndex, reviewIndex) {
+  const stored = JSON.parse(sessionStorage.getItem('lastQueryResults') || "null");
+  if (!Array.isArray(stored) || !stored[colIndex]) {
+    document.getElementById('modalText').innerText = 'Could not load review.';
+  } else {
+    const review = stored[colIndex].alumni_reviews ? stored[colIndex].alumni_reviews[reviewIndex] : null;
+    if (!review) {
+      document.getElementById('modalText').innerText = 'Review not found.';
+    } else {
+      document.getElementById('modalText').innerHTML = `<strong>${escapeHtml(review.name || '')} (${escapeHtml(review.rating || '')})</strong>: <p>${escapeHtml(review.review || '')}</p>`;
+    }
+  }
+  document.getElementById('reviewModal').style.display = 'flex';
+  document.getElementById('reviewModal').setAttribute('aria-hidden', 'false');
+}
+function closeModal() { document.getElementById('reviewModal').style.display = 'none'; document.getElementById('reviewModal').setAttribute('aria-hidden', 'true'); }
+
+// -------------------- Schema Modal --------------------
+function showSchema() {
+  const schemaHTML = `
+<h4 class="font-bold mt-2">alumni_reviews</h4>
+<table style="width:100%; border-collapse:collapse; margin-bottom:1rem;">
+  <thead>
+    <tr style="background:#e0d7f8;">
+      <th style="border:1px solid #ccc; padding:6px;">Column</th>
+      <th style="border:1px solid #ccc; padding:6px;">Type</th>
+      <th style="border:1px solid #ccc; padding:6px;">Constraints</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>id</td><td>SERIAL</td><td>PRIMARY KEY</td></tr>
+    <tr><td>name</td><td>TEXT</td><td></td></tr>
+    <tr><td>college</td><td>TEXT</td><td>FOREIGN KEY → college_profiles(college)</td></tr>
+    <tr><td>review</td><td>TEXT</td><td></td></tr>
+    <tr><td>rating</td><td>NUMERIC</td><td></td></tr>
+  </tbody>
+</table>
+
+<h4 class="font-bold mt-2">college_profiles</h4>
+<table style="width:100%; border-collapse:collapse;">
+  <thead>
+    <tr style="background:#e0d7f8;">
+      <th style="border:1px solid #ccc; padding:6px;">Column</th>
+      <th style="border:1px solid #ccc; padding:6px;">Type</th>
+      <th style="border:1px solid #ccc; padding:6px;">Constraints</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>college</td><td>TEXT</td><td>PRIMARY KEY</td></tr>
+    <tr><td>state</td><td>TEXT</td><td></td></tr>
+    <tr><td>stream</td><td>TEXT</td><td></td></tr>
+    <tr><td>ug_fee</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>pg_fee</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>rating</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>academic</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>accommodation</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>faculty</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>infrastructure</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>placement</td><td>NUMERIC</td><td></td></tr>
+    <tr><td>social_life</td><td>NUMERIC</td><td></td></tr>
+  </tbody>
+</table>
+`;
+
+  document.getElementById('schemaContent').innerHTML = schemaHTML;
+  document.getElementById('schemaModal').style.display = 'flex';
+  document.getElementById('schemaModal').setAttribute('aria-hidden', 'false');
+}
+function closeSchema() { document.getElementById('schemaModal').style.display = 'none'; document.getElementById('schemaModal').setAttribute('aria-hidden', 'true'); }
+window.addEventListener('DOMContentLoaded', () => {
+  const content = document.getElementById('pageContent');
+  // small delay for a smoother feel
+  setTimeout(() => content.classList.add('show'), 50);
+});
+
+// -------------------- Init UI if session has results --------------------
+(function initFromSession() {
+  if (Array.isArray(lastQueryResults) && lastQueryResults.length > 0) {
+    populateTable(lastQueryResults);
+    populateCards(lastQueryResults);
+    resultsTable.style.display = 'table';
+    switchToTable();
+  }
+})();
+</script>
+</body>
+</html>

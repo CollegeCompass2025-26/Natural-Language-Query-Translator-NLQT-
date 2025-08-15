@@ -25,6 +25,9 @@ ABSOLUTE RULES — NEVER BREAK THESE:
 4. ALWAYS add `LIMIT 500` if no explicit LIMIT is present.
 5. Use ONLY exact column names as shown in schema.
 6. No ambiguous references — qualify all columns with table aliases.
+7. **ALL string/text filters MUST be case-insensitive: ALWAYS wrap both sides of the comparison in LOWER().**
+   - Example: use LOWER(cp.state) = 'tamil nadu' instead of cp.state = 'Tamil Nadu'.
+   - If using LIKE, also apply LOWER(): LOWER(column) LIKE LOWER('%value%').
 ======================
 
 ALWAYS INCLUDE THESE OUTPUT COLUMNS:
