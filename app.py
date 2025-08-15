@@ -8,7 +8,6 @@ from prompt_builder import build_prompt
 from gemini_client import generate_sql
 from sql_validator import is_safe_sql
 from normalizer import normalize_query
-from waitress import serve  # <-- Waitress import
 
 load_dotenv()
 
@@ -134,18 +133,9 @@ def nlp_query():
             "sql": sql
         }), 400
 
-# ---------- RUN WITH WAITRESS OR GUNICORN ----------
-if __name__ == "__main__":
-    import platform
-    port = int(os.getenv("PORT", 5000))
-    
-    # Windows / local dev
-    if platform.system() == "Windows":
-        from waitress import serve
-        print(f"Starting Waitress on http://127.0.0.1:{port}")
-        serve(app, host="0.0.0.0", port=port)
-    else:
-        # Linux / Render / production
-        print(f"Use Gunicorn to serve this app on port {port}")
-        app.run(host="0.0.0.0", port=port)
 
+# ---------- LOCAL DEV ONLY ----------
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    print(f"Running Flask locally on http://127.0.0.1:{port}")
+    app.run(host="0.0.0.0", port=port, debug=True)
