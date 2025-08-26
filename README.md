@@ -1,7 +1,7 @@
 
 # Natural Language Query Translator (NLQT)
 
-**Live App:** https://lnkd.in/dnqEzcib
+**Live App:** [https://lnkd.in/dnqEzcib](https://natural-language-query-translator-nlqt.onrender.com/)
 
 NLQT lets anyone query a PostgreSQL database in plain English. It:
 - Normalizes the user’s question into database-friendly phrasing.
@@ -229,3 +229,4 @@ static/
 
 ## License
 Add a `LICENSE` file (recommendation: **MIT** for permissive use).
+
